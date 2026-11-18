@@ -1,0 +1,21 @@
+{
+  "fault": 0,
+  "overflow": 1,
+  "underflow": 0,
+  "lp_fault": 0,
+  "fault_count": 0,
+  "lost": 0,
+  "skip_count": 0,
+  "last_bad_pc": 0,
+  "depth": 1,
+  "first_bad_pc": null,
+  "packets": 846,
+  "instructions": 9326,
+  "traps": 1,
+  "config": {
+    "ovf_sat": false,
+    "unf_fault": false,
+    "lp_en": false
+  },
+  "win_addr": 106
+}
