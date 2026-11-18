@@ -59,24 +59,31 @@ module ss_host_rx (
       sof_sync  <= 2'b00;
       remaining <= 3'd0;
       pkt_valid <= 1'b0;
-      cmd       <= 4'd0;
-      trap      <= 1'b0;
-      payload   <= 40'd0;
     end else begin
       stb_sync  <= {stb_sync[1:0], strobe_in};
       sof_sync  <= {sof_sync[0], sof_in};
       pkt_valid <= 1'b0;
       if (byte_stb) begin
         if (sof) begin
-          cmd       <= data[7:4];
-          trap      <= data[0];
           remaining <= hdr_known ? hdr_len : 3'd0;
           pkt_valid <= hdr_known && (hdr_len == 3'd0);
         end else if (busy) begin
-          payload   <= {data, payload[39:8]};
           remaining <= remaining - 3'd1;
           pkt_valid <= (remaining == 3'd1);
         end
+      end
+    end
+  end
+
+  // Packet registers need no reset: they are only used when pkt_valid is set,
+  // which requires a complete packet after reset. This saves area.
+  always @(posedge clk) begin
+    if (byte_stb) begin
+      if (sof) begin
+        cmd  <= data[7:4];
+        trap <= data[0];
+      end else if (busy) begin
+        payload <= {data, payload[39:8]};
       end
     end
   end

@@ -1,42 +1,109 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Tiny Tapeout Verilog Project Template
+# Zicfiss-inspired external shadow-stack monitor
 
-- [Read the documentation for project](docs/info.md)
+A Tiny Tapeout (Sky130, ttsky26d) tile that checks the **return-address
+integrity** of a RISC-V RV32IMC CPU from the outside. A host streams the CPU's
+retired-instruction trace into the tile. The tile finds calls and returns using
+the RISC-V return-address-stack hints, keeps its own shadow stack in on-chip
+flip-flops, and raises a sticky **FAULT** when a return doesn't land where the
+matching call expects. Stack smashing and ROP-style attacks are the typical cause.
 
-## What is Tiny Tapeout?
+> **Zicfiss-inspired, not Zicfiss-compliant.** This is a trace-based external
+> monitor. It detects attacks but doesn't prevent them.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+- Datasheet / pinout / protocol: [docs/info.md](docs/info.md)
+- Exact rules (decode table, overflow/underflow policies, edge cases): [docs/design.md](docs/design.md)
+- Local environment: [SETUP.md](SETUP.md)
 
-To learn more and get started, visit https://tinytapeout.com.
+## Architecture
 
-## Set up your Verilog project
+```mermaid
+flowchart LR
+  host["Host<br/>(RP2040 / FPGA)"] -- "ui_in, STROBE, SOF" --> rx[ss_host_rx]
+  rx -- TRACE --> dec[ss_cf_decode]
+  dec --> stk[ss_shadow_stack]
+  dec --> chk[ss_checker]
+  stk --> chk
+  rx -- commands --> stk & chk & rb[ss_readback]
+  chk --> rb
+  stk --> rb
+  rb -- uo_out --> host
+  chk -- "FAULT / OVF / UNF / LP" --> host
+```
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+| File | Role |
+|---|---|
+| `src/tt_um_sidisnotacoder_shadowstack.v` | Top level, pin map, CONFIG register |
+| `src/ss_host_rx.v` | 2-flop synchronizers, strobe edge detect, SOF resync, packet assembly |
+| `src/ss_cf_decode.v` | Combinational JAL/JALR/C.JAL/C.JR/C.JALR/LPAD classifier |
+| `src/ss_shadow_stack.v` | Circular buffer, depth, `lost` counter, WRAP/SATURATE, desync |
+| `src/ss_checker.v` | Pending-return compare, sticky flags, counters, `last_bad_pc`, landing-pad check |
+| `src/ss_readback.v` | VIEW register and `uo_out` mux |
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+## Verification
 
-## Enable GitHub actions to build the results page
+| What | How | Result |
+|---|---|---|
+| Golden model | `model/shadow_model.py` + hand-checked unit tests (`pytest model`) | 30 pass |
+| RTL vs model | cocotb, outputs compared after **every** packet (`cd test && make`) | 16 tests pass |
+| Directed coverage | every hint-table row (32-bit and compressed), decoys (C.MV, C.ADD, C.EBREAK, C.J, non-link JAL/JALR), PC+2/PC+4, pop-then-push, WRAP/SATURATE deep recursion, underflow IGNORE/FAULT, TRAP skip, all commands, SOF resync, lost-counter saturation, forward edge | pass |
+| Random | 5,000-packet random call trees (seeded; `SEED=…`, `RANDOM_PACKETS=…`) | pass |
+| Mutation check | 5 deliberate RTL bugs (decoder, stack policy, skip counter, parser) | all 5 caught |
+| Spike traces | 4 bare-metal programs replayed through the RTL | see below |
+| Gate level | same suite on the hardened netlist (`make GATES=yes`) | AREA_TBD |
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+### Spike demo
 
-## Resources
+`sw/demo.c` is built four ways (`make -C sw`) and run with
+`spike --isa=rv32imc_zicsr -l --log-commits`. `tools/spike_to_trace.py` turns the
+commit log into packets. By default it keeps only the jumps, the instruction after
+each jump, and trap targets (about 9% of instructions), and it checks that this
+gives the same result as the full trace.
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+| Trace | Program | Result |
+|---|---|---|
+| `clean` | nested calls, recursion deeper than the stack, function pointers, an ECALL trap | no fault (overflow set, no false positives) |
+| `attack` | `process()` overflows a stack buffer and overwrites the saved `ra` with `&win` | **FAULT**, `last_bad_pc = 0x006a` = `win()` |
+| `lp_clean` | clean, built with `-fcf-protection=branch` (Zicfilp landing pads), forward-edge check on | no fault |
+| `lp_attack` | an indirect call to `win+4`, past its landing pad | **LP_FAULT** |
 
-## What next?
+## Area and timing
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+AREA_TBD
+
+## Hardware demo
+
+`demo/rp2040_replay.py` (MicroPython, Tiny Tapeout demo board) replays
+`clean.bin`, then CLEAR_FLAGS, then `attack.bin`, and prints `last_bad_pc`.
+It has **not been tested on hardware** yet, so check the `ttboard` SDK attribute names.
+
+## Limitations
+
+- **Detection only.** It doesn't stop the CPU unless the FAULT pin is wired to halt or reset it.
+- **False positives** with setjmp/longjmp, C++ exception unwinding, coroutines and
+  context switches. Send RESET_STACK when switching contexts.
+- **Traps and interrupts** need the TRAP bit from the host. Without it, an interrupt
+  taken right after a return causes a false fault. With it, that one check is skipped
+  (counted in view 8).
+- **Only DEPTH frames are checked.** Deeper frames are counted in `lost`, not verified.
+  After more than 255 lost frames the monitor enters *desync* and stops checking until
+  RESET_STACK.
+- **Address aliasing:** only the low ADDR_W bits (16) are compared, so return targets
+  64 KiB apart can't be told apart.
+- **Landing-pad labels and alignment are not checked.**
+- Zicfiss-inspired, **not** Zicfiss/Zicfilp compliant.
+
+## Repository layout
+
+```
+src/        RTL                      test/     cocotb testbench (tb.v, tb_host.py, test.py)
+model/      Python golden model      sw/       bare-metal demo programs (Spike)
+tools/      Spike log -> packets     traces/   generated packet streams + expected results
+demo/       RP2040 MicroPython       docs/     datasheet + design notes
+```
+
+## About Tiny Tapeout
+
+[Tiny Tapeout](https://tinytapeout.com) is an educational project that makes it
+easier and cheaper than ever to get digital designs manufactured on a real chip.
