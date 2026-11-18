@@ -76,3 +76,9 @@ For compressed instructions, send the 16-bit encoding in INST[15:0]. INST[23:16]
 
 None required. The demo board's RP2040 acts as the trace host. LEDs on uio[3:5]
 show the sticky flags, and the 7-segment display shows `uo_out`.
+
+## Credits
+
+We gratefully acknowledge the Center of Excellence (CoE) in Integrated Circuits and Systems (ICAS) and the Department of Electronics and Communication Engineering (ECE) for providing the necessary resources and guidance.
+
+Special thanks to Dr. H V Ravish Aradhya (HoD - ECE), Dr. K R Usha Rani (Associate Dean - PG), Dr. K. S. Geetha (Vice Principal) and Dr. K. N. Subramanya (Principal) for their constant encouragement and support in facilitating this Tiny Tapeout SKY26E submission.

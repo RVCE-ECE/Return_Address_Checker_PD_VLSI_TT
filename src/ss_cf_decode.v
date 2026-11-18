@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Sidisnotacoder
+ * Copyright (c) 2026 Siddharth Senthil Kumar, Sumedh Kallapur, Vibin DJ, Yatin Sangwan
  * SPDX-License-Identifier: Apache-2.0
  *
  * ss_cf_decode: classify an RV32IMC instruction using the RISC-V

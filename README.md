@@ -136,6 +136,15 @@ tools/      Spike log -> packets     traces/   generated packet streams + expect
 demo/       RP2040 MicroPython       docs/     datasheet + design notes
 ```
 
+## Authors and credits
+
+Siddharth Senthil Kumar, Sumedh Kallapur, Vibin DJ and Yatin Sangwan, with
+Shylashree N, RV College of Engineering (RVCE), Bengaluru.
+
+We gratefully acknowledge the Center of Excellence (CoE) in Integrated Circuits and Systems (ICAS) and the Department of Electronics and Communication Engineering (ECE) for providing the necessary resources and guidance.
+
+Special thanks to Dr. H V Ravish Aradhya (HoD - ECE), Dr. K R Usha Rani (Associate Dean - PG), Dr. K. S. Geetha (Vice Principal) and Dr. K. N. Subramanya (Principal) for their constant encouragement and support in facilitating this Tiny Tapeout SKY26E submission.
+
 ## About Tiny Tapeout
 
 [Tiny Tapeout](https://tinytapeout.com) is an educational project that makes it

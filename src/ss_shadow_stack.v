@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Sidisnotacoder
+ * Copyright (c) 2026 Siddharth Senthil Kumar, Sumedh Kallapur, Vibin DJ, Yatin Sangwan
  * SPDX-License-Identifier: Apache-2.0
  *
  * ss_shadow_stack: circular buffer of return addresses with a `lost` counter.
