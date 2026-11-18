@@ -16,6 +16,7 @@ import cocotb
 
 from tb_host import (
     GL,
+    HW_CONFIG,
     C_EBREAK,
     C_NOP,
     NOP,
@@ -36,6 +37,8 @@ from tb_host import (
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRACE_DIR = os.path.join(HERE, "..", "traces")
+LBPC = HW_CONFIG["lbpc_built"]   # last_bad_pc register built?
+LP = HW_CONFIG["lp_en_built"]     # forward-edge check built?
 RANDOM_PACKETS = int(os.environ.get("RANDOM_PACKETS", "800" if GL else "5000"))
 
 
@@ -138,11 +141,15 @@ async def test_return_address_width(dut):
     await h.trace(0x2000, c_jal())                # 16-bit call -> 0x2002
     await h.trace(0x3000, c_jr(1))
     await h.trace(0x2004, NOP)                    # wrong: should be 0x2002
-    assert h.model.fault and h.model.last_bad_pc == 0x2004
+    assert h.model.fault
+    assert h.model.last_bad_pc == (0x2004 if LBPC else 0)
     await h.trace(0x3002, jalr(0, 1))
     await h.trace(0x1004, NOP)
     assert h.model.fault_count == 1
-    assert await h.read_view(5) == 0x04 and await h.read_view(6) == 0x20
+    if LBPC:
+        assert await h.read_view(5) == 0x04 and await h.read_view(6) == 0x20
+    else:  # not built: views 5/6 read 0
+        assert await h.read_view(5) == 0 and await h.read_view(6) == 0
     # PC wrap at 16 bits
     await h.clear_flags()
     await h.trace(0xFFFE, c_jal())
@@ -300,6 +307,16 @@ async def test_lost_saturation_desync(dut):
 @cocotb.test()
 async def test_forward_edge(dut):
     h = await new_host(dut)
+    if not LP:
+        # Not built: the CONFIG bit must have no effect and LP_FAULT stays 0.
+        await h.config(lp_en=True)
+        await h.trace(0x100, jalr(1, 6))
+        await h.trace(0x200, NOP)
+        await h.trace(0x204, c_jr(6))
+        await h.trace(0x300, auipc(1))
+        assert not h.model.lp_fault and (int(dut.uio_out.value) >> 6) & 1 == 0
+        dut._log.info("forward-edge check not built (LP_EN=0); checked that it stays off")
+        return
     # disabled by default
     await h.trace(0x100, jalr(0, 6))
     await h.trace(0x200, NOP)
@@ -423,5 +440,5 @@ async def test_trace_replay(dut):
         assert int(m.lp_fault) == expect.get("lp_fault", 0), name
         if expect["fault"]:
             assert m.last_bad_pc == expect["last_bad_pc"], name
-            if "win_addr" in expect:  # the hijacked return lands on win()'s entry
+            if LBPC and "win_addr" in expect:  # the hijacked return lands on win()'s entry
                 assert m.last_bad_pc == expect["win_addr"], name

@@ -6,9 +6,15 @@
   "fault_count": 1,
   "lost": 1,
   "skip_count": 0,
-  "last_bad_pc": 106,
+  "last_bad_pc": 0,
   "depth": 1,
-  "first_bad_pc": 106,
+  "first_bad_pc": 0,
+  "hw": {
+    "depth": 6,
+    "addr_w": 16,
+    "lp_en_built": false,
+    "lbpc_built": false
+  },
   "packets": 817,
   "instructions": 9326,
   "traps": 1,

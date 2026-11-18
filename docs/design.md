@@ -26,12 +26,20 @@ flowchart LR
 
 ## Parameters
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `DEPTH` | 8 | Shadow-stack entries (1..15) |
-| `ADDR_W` | 16 | Return-address bits stored and compared (1..16) |
-| `LP_EN` | 1 | Build the forward-edge (landing pad) check |
-| `LBPC` | 1 | Build the `last_bad_pc` register |
+| Parameter | Taped-out (1×1) | Full spec | Meaning |
+|---|---|---|---|
+| `DEPTH` | 6 | 8 | Shadow-stack entries (1..15) |
+| `ADDR_W` | 16 | 16 | Return-address bits stored and compared (1..16) |
+| `LP_EN` | 0 | 1 | Build the forward-edge (landing pad) check |
+| `LBPC` | 0 | 1 | Build the `last_bad_pc` register |
+
+The full-spec configuration needs a 1×2 tile. In a 1×1 tile it fails placement:
+the design synthesizes to about 13,300 µm² of the 16,500 µm² core before hold
+fixing. Following the spec's cut order, the 1×1 build drops `last_bad_pc`,
+then the forward-edge check, then reduces DEPTH to 6. DEPTH 8 or 7 without the
+features, and DEPTH 6 with them, were also tried and failed placement or
+routing. The model's `HW_CONFIG` (in `model/shadow_model.py`) must match these
+defaults.
 
 ## Classification (`ss_cf_decode`)
 

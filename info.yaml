@@ -54,7 +54,7 @@ pinout:
   uio[3]: "FAULT (out)"
   uio[4]: "OVERFLOW (out)"
   uio[5]: "UNDERFLOW (out)"
-  uio[6]: "LP_FAULT (out)"
+  uio[6]: "LP_FAULT (out, always 0 in this build)"
   uio[7]: "BUSY (out)"
 
 # Do not change!

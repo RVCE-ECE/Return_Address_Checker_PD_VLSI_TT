@@ -9,6 +9,12 @@
   "last_bad_pc": 0,
   "depth": 1,
   "first_bad_pc": null,
+  "hw": {
+    "depth": 6,
+    "addr_w": 16,
+    "lp_en_built": false,
+    "lbpc_built": false
+  },
   "packets": 846,
   "instructions": 9531,
   "traps": 1,

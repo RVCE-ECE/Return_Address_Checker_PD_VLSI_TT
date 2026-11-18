@@ -17,13 +17,13 @@ checks that the next instruction is at the address the matching call expects.
 If it isn't (for example after a stack-smashing / ROP attack), the sticky
 **FAULT** output goes high.
 
-* Shadow stack: 8 entries × 16 address bits. Deeper call chains are tracked
+* Shadow stack: 6 entries × 16 address bits. Deeper call chains are tracked
   with a `lost` counter, so they never cause false faults. Overflow policy WRAP
-  (default) checks the innermost 8 frames. SATURATE checks the outermost 8.
+  (default) checks the innermost 6 frames. SATURATE checks the outermost 6.
 * Underflow (a return with no matching call) sets UNDERFLOW, and optionally FAULT.
-* Optional forward-edge check: after an indirect jump/call (not a return, and not via x7)
-  the next instruction must be a Zicfilp landing pad (`lpad` = `auipc x0, imm`), or
-  LP_FAULT is set. Labels are not checked.
+* The RTL also has a forward-edge (Zicfilp landing pad) check and a `last_bad_pc`
+  register. To fit a 1×1 tile, **neither is built in this tapeout**: LP_FAULT (uio[6])
+  always reads 0, CONFIG bit 2 has no effect, and views 5/6 read 0.
 * Instructions reached by a trap or interrupt are marked by the host (TRAP bit), so a
   return interrupted by an interrupt is skipped instead of being reported as a fault.
 
@@ -54,7 +54,7 @@ For compressed instructions, send the 16-bit encoding in INST[15:0]. INST[23:16]
 | 1, 2 | expected return address, low / high byte |
 | 3 | fault count |
 | 4 | lost frames |
-| 5, 6 | last bad PC, low / high byte |
+| 5, 6 | last bad PC (not built in this tapeout: reads 0) |
 | 7 | ID byte `0x5A` |
 | 8 | skipped checks (TRAP) |
 
@@ -66,13 +66,13 @@ For compressed instructions, send the 16-bit encoding in INST[15:0]. INST[23:16]
    * TRACE `0x10, 0x00,0x02, 0x67,0x80,0x00` (`ret` at PC 0x0200)
    * TRACE `0x10, 0x04,0x01, 0x13,0x00,0x00` (lands at 0x0104): no fault, depth 0
 3. Repeat, but land somewhere else (e.g. PC 0x0108): FAULT (uio[3]) goes high, and
-   views 5/6 show 0x0108.
+   view 3 (fault count) reads 1. View 1/2 show the expected address 0x0104.
 4. The repository has Spike traces of a clean and an attacked C program
    (`traces/*.bin`) and a MicroPython script (`demo/rp2040_replay.py`) that replays them
-   from the demo board's RP2040. The clean trace gives no fault. The attacked one faults
-   at the entry of `win()`.
+   from the demo board's RP2040. The clean trace gives no fault. The attacked one sets
+   FAULT when the hijacked return lands on `win()`.
 
 ## External hardware
 
-None required. The demo board's RP2040 acts as the trace host. LEDs on uio[3:6]
+None required. The demo board's RP2040 acts as the trace host. LEDs on uio[3:5]
 show the sticky flags, and the 7-segment display shows `uo_out`.

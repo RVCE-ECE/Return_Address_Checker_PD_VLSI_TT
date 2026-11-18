@@ -18,6 +18,12 @@ PAYLOAD_LEN = {CMD_TRACE: 5, CMD_RESET_STACK: 0, CMD_CLEAR_FLAGS: 0, CMD_CONFIG:
 ID_BYTE = 0x5A
 NUM_VIEWS = 9
 
+# Parameters of the hardware that is actually built. Keep in sync with the
+# defaults in src/tt_um_sidisnotacoder_shadowstack.v (1x1 tile: DEPTH 6, no
+# forward-edge check, no last_bad_pc). The 1x2 build uses
+# dict(depth=8, addr_w=16, lp_en_built=True, lbpc_built=True).
+HW_CONFIG = dict(depth=6, addr_w=16, lp_en_built=False, lbpc_built=False)
+
 LINK = (1, 5)
 LP_EXEMPT = (1, 5, 7)
 
@@ -81,6 +87,7 @@ def _sat_inc(v: int) -> int:
 
 class ShadowModel:
     def __init__(self, depth: int = 8, addr_w: int = 16, lp_en_built: bool = True, lbpc_built: bool = True):
+        """Defaults describe the full design. Use ShadowModel(**HW_CONFIG) for the built tile."""
         assert 1 <= depth <= 15 and 1 <= addr_w <= 16
         self.DEPTH = depth
         self.ADDR_W = addr_w

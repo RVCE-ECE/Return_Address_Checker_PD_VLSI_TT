@@ -28,7 +28,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "model"))
-from shadow_model import CMD_TRACE, ShadowModel, decode, trace_payload  # noqa: E402
+from shadow_model import CMD_TRACE, HW_CONFIG, ShadowModel, decode, trace_payload  # noqa: E402
 
 COMMIT_RE = re.compile(r"^core\s+\d+:\s+(\d)\s+0x([0-9a-fA-F]+)\s+\(0x([0-9a-fA-F]+)\)")
 EXC_RE = re.compile(r"^core\s+\d+:\s+(exception|interrupt|trap)\b")
@@ -71,8 +71,11 @@ def compact(recs):
     return out
 
 
-def run_model(recs, cfg=0):
-    m = ShadowModel()
+FULL_CONFIG = dict(depth=8, addr_w=16, lp_en_built=True, lbpc_built=True)
+
+
+def run_model(recs, cfg=0, hw=None):
+    m = ShadowModel(**(hw or HW_CONFIG))
     m.config(cfg)
     first_fault_pc = None
     for pc, inst, trap in recs:
@@ -110,6 +113,8 @@ def main():
     ap.add_argument("--config", type=lambda s: int(s, 0), default=0, help="CONFIG byte to replay with")
     ap.add_argument("--elf", help="ELF file, to look up the 'win' symbol for the report")
     ap.add_argument("--nm", default="riscv64-elf-nm")
+    ap.add_argument("--full-hw", action="store_true",
+                    help="model the full 1x2 build (DEPTH 8, forward-edge, last_bad_pc) instead of HW_CONFIG")
     args = ap.parse_args()
 
     recs = parse_log(args.log, args.min_pc)
@@ -117,8 +122,9 @@ def main():
         sys.exit(f"no commit lines found in {args.log} (was Spike run with --log-commits?)")
     small = compact(recs)
 
-    m_full, _ = run_model(recs, args.config)
-    m_small, first_bad = run_model(small, args.config)
+    hw = FULL_CONFIG if args.full_hw else HW_CONFIG
+    m_full, _ = run_model(recs, args.config, hw)
+    m_small, first_bad = run_model(small, args.config, hw)
     if summary(m_full) != summary(m_small):
         sys.exit(f"compaction changed the result!\n full:  {summary(m_full)}\n small: {summary(m_small)}")
     keep = recs if args.full else small
@@ -129,6 +135,7 @@ def main():
 
     res = summary(m_small)
     res["first_bad_pc"] = first_bad
+    res["hw"] = hw
     res["packets"] = len(keep)
     res["instructions"] = len(recs)
     res["traps"] = sum(t for _, _, t in recs)

@@ -16,6 +16,7 @@ from shadow_model import (  # noqa: E402
     CMD_RESET_STACK,
     CMD_SET_VIEW,
     CMD_TRACE,
+    HW_CONFIG,
     NUM_VIEWS,
     PAYLOAD_LEN,
     ShadowModel,
@@ -85,7 +86,7 @@ NOP = 0x000013
 class Host:
     def __init__(self, dut, model_kwargs=None):
         self.dut = dut
-        self.model = ShadowModel(**(model_kwargs or {}))
+        self.model = ShadowModel(**(model_kwargs or HW_CONFIG))
         self.n_packets = 0
 
     async def start(self):
@@ -185,7 +186,7 @@ def parse_packet_stream(data: bytes):
 
 
 __all__ = [
-    "Host", "GL", "parse_packet_stream",
+    "Host", "GL", "HW_CONFIG", "parse_packet_stream",
     "jal", "jalr", "lpad", "auipc", "addi", "c_jal", "c_j", "c_jr", "c_jalr", "c_mv", "c_add",
     "C_EBREAK", "C_NOP", "NOP",
     "CMD_TRACE", "CMD_RESET_STACK", "CMD_CLEAR_FLAGS", "CMD_CONFIG", "CMD_SET_VIEW",

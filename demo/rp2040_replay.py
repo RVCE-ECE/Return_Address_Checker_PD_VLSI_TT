@@ -15,7 +15,8 @@ Demo:
     1. replay clean.bin   -> no fault
     2. CLEAR_FLAGS
     3. replay attack.bin  -> fault LED (uio[3]) lights
-    4. read last_bad_pc (views 5/6); it should equal win() (0x006a in attack.json)
+    4. read the fault count (view 3) and the expected return address (views 1/2).
+       (last_bad_pc, views 5/6, is not built in the 1x1 tapeout and reads 0.)
 """
 
 import time
@@ -119,8 +120,8 @@ def main():
     n = replay(p, "attack.bin")
     print("attack.bin: %d packets" % n)
     report(p, "attack")
-    bad = read_view(p, 5) | read_view(p, 6) << 8
-    print("last_bad_pc = 0x%04x (expected win() = 0x006a)" % bad)
+    exp = read_view(p, 1) | read_view(p, 2) << 8
+    print("fault_count = %d, expected return address = 0x%04x" % (read_view(p, 3), exp))
     send(p, CMD_VIEW, b"\x00")
 
 

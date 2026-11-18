@@ -17,10 +17,10 @@
 `default_nettype none
 
 module tt_um_sidisnotacoder_shadowstack #(
-    parameter DEPTH  = 8,
+    parameter DEPTH  = 6,    // 8 does not fit a 1x1 tile
     parameter ADDR_W = 16,
-    parameter LP_EN  = 1,
-    parameter LBPC   = 1
+    parameter LP_EN  = 0,    // forward-edge check: needs a 1x2 tile
+    parameter LBPC   = 0     // last_bad_pc register: needs a 1x2 tile
 ) (
     input  wire [7:0] ui_in,
     output wire [7:0] uo_out,

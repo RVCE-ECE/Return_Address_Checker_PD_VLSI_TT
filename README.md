@@ -51,7 +51,7 @@ flowchart LR
 | Random | 5,000-packet random call trees (seeded; `SEED=…`, `RANDOM_PACKETS=…`) | pass |
 | Mutation check | 5 deliberate RTL bugs (decoder, stack policy, skip counter, parser) | all 5 caught |
 | Spike traces | 4 bare-metal programs replayed through the RTL | see below |
-| Gate level | same suite on the hardened netlist (`make GATES=yes`) | AREA_TBD |
+| Gate level | same suite on the hardened netlist (`make GATES=yes`, 800 random packets) | 16 tests pass |
 
 ### Spike demo
 
@@ -64,13 +64,45 @@ gives the same result as the full trace.
 | Trace | Program | Result |
 |---|---|---|
 | `clean` | nested calls, recursion deeper than the stack, function pointers, an ECALL trap | no fault (overflow set, no false positives) |
-| `attack` | `process()` overflows a stack buffer and overwrites the saved `ra` with `&win` | **FAULT**, `last_bad_pc = 0x006a` = `win()` |
+| `attack` | `process()` overflows a stack buffer and overwrites the saved `ra` with `&win` | **FAULT** at the hijacked return (lands on `win()` = `0x006a`) |
 | `lp_clean` | clean, built with `-fcf-protection=branch` (Zicfilp landing pads), forward-edge check on | no fault |
-| `lp_attack` | an indirect call to `win+4`, past its landing pad | **LP_FAULT** |
+| `lp_attack` | an indirect call to `win+4`, past its landing pad | **LP_FAULT** in the full (1×2) build; not built in the 1×1 tapeout |
+
+`last_bad_pc = 0x006a` for the attack and the LP_FAULT result were verified on the
+full configuration (DEPTH 8, all features). The 1×1 tapeout leaves those features out,
+see below. Run `tools/spike_to_trace.py --full-hw` to model the full build.
 
 ## Area and timing
 
-AREA_TBD
+The full spec (DEPTH 8, `last_bad_pc`, forward-edge check) needs a 1×2 tile. To fit
+**1×1**, this tapeout follows the spec's cut order. The cut features are still in the
+RTL behind parameters (`src/tt_um_sidisnotacoder_shadowstack.v`).
+
+| Configuration tried (1×1 unless noted) | Result |
+|---|---|
+| DEPTH 8, all features | placement fails (synth ≈ 13,300 µm² of 16,500 µm² core) |
+| DEPTH 8, no `last_bad_pc` | placement fails |
+| DEPTH 8, no `last_bad_pc`, no forward-edge | placement fails |
+| DEPTH 7, no `last_bad_pc`, no forward-edge | routing doesn't converge |
+| DEPTH 6, all features | routing doesn't converge |
+| **DEPTH 6, no `last_bad_pc`, no forward-edge** | **taped out** |
+| DEPTH 8, all features, 1×2 tile | fits, 51 % utilization |
+
+Taped-out build (LibreLane 3.0.14, sky130A, `CLOCK_PERIOD` 20 ns):
+
+| Metric | Value |
+|---|---|
+| Tile | 1×1 (167 × 108 µm) |
+| Standard cells (excl. fill/tap) | 1,148, of which 208 flip-flops |
+| Utilization | 74.6 % |
+| Setup worst slack @ 50 MHz | +3.59 ns, so f<sub>max</sub> ≈ 61 MHz (typical corner) |
+| Hold worst slack | +0.11 ns, 0 violations |
+| DRC / LVS / antenna | 0 / 0 / 0 |
+| Max-slew warnings | 313 (reported by the flow, not signoff errors) |
+
+The host interface is asynchronous to the tile clock. A TRACE packet takes 6 strobed
+bytes, and each byte needs ≥ 3 tile clocks high and low, so at 50 MHz the tile accepts
+at most about 1.4 M packets/s.
 
 ## Hardware demo
 
@@ -86,12 +118,13 @@ It has **not been tested on hardware** yet, so check the `ttboard` SDK attribute
 - **Traps and interrupts** need the TRAP bit from the host. Without it, an interrupt
   taken right after a return causes a false fault. With it, that one check is skipped
   (counted in view 8).
-- **Only DEPTH frames are checked.** Deeper frames are counted in `lost`, not verified.
+- **Only DEPTH (6) frames are checked.** Deeper frames are counted in `lost`, not verified.
   After more than 255 lost frames the monitor enters *desync* and stops checking until
   RESET_STACK.
 - **Address aliasing:** only the low ADDR_W bits (16) are compared, so return targets
   64 KiB apart can't be told apart.
-- **Landing-pad labels and alignment are not checked.**
+- **No forward-edge check or `last_bad_pc` in the 1×1 tapeout** (area). Landing-pad labels and alignment
+  are never checked, even in the full build.
 - Zicfiss-inspired, **not** Zicfiss/Zicfilp compliant.
 
 ## Repository layout
